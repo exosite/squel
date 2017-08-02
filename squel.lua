@@ -2119,6 +2119,17 @@ squel.flavours.postgres = function(_squel)
 			end
 		end
 
+		function cls.PostgresOnConflictKeyUpdateBlock:onConflictOnConstraint(constraint, fields)
+			self._onConstraint = true
+			self._dupIndex = self:_sanitizeField(constraint)
+
+			if (fields) then
+				for field, value in pairs(fields) do
+					self:_set(field, value)
+				end
+			end
+		end
+
 		function cls.PostgresOnConflictKeyUpdateBlock:_toParamString(options)
 			options = options or {}
 			local totalStr, totalValues = '', {}
@@ -2148,8 +2159,12 @@ squel.flavours.postgres = function(_squel)
 				end
 			end
 
+			local template = self._onConstraint
+					and 'ON CONFLICT ON CONSTRAINT %s DO '
+					or 'ON CONFLICT (%s) DO '
+
 			return {
-				text = self._dupIndex and ('ON CONFLICT (%s) DO '):format(self._dupIndex)
+				text = self._dupIndex and (template):format(self._dupIndex)
 					.. (not (#totalStr > 0) and 'NOTHING' or ('UPDATE SET %s'):format(totalStr)) or '',
 				values = totalValues,
 			}
