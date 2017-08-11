@@ -2,9 +2,9 @@
 squel
 @module squel
 ]]
-local L = require('lodash')
-local R = require('moses')
-local Object = require('object')
+local L = require('lodash') or require('src.lodash')
+local R = require('moses') or require('src.moses')
+local Object = require('object') or require('src.object')
 
 -- append to string if non-empty
 local function _pad(str, pad)
