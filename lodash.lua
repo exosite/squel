@@ -2,7 +2,7 @@
 lodash
 @module lodash
 ]]
-local R = require('moses')
+local R = require('moses') or require('src.moses')
 
 local lodash = {}
 
