@@ -109,6 +109,10 @@ local function _buildSquel(flavour)
 		end
 	}
 
+	local function _shouldApplyNesting(obj)
+		return (not cls._isSquelBuilder(obj)) or (not obj.options.rawNesting)
+	end
+
 	-- default query builder options
 	cls.DefaultQueryBuilderOptions = {
 		-- If true then table names will be rendered inside quotes.
@@ -147,6 +151,8 @@ local function _buildSquel(flavour)
 		separator = ' ',
 		-- Function for formatting string values prior to insertion into query string
 		stringFormatter = nil,
+    -- Whether to prevent the addition of brackets () when nesting this query builder's output
+    rawNesting = false,
 	}
 
 	-- Global custom value handlers for all instances of builder
@@ -383,6 +389,14 @@ local function _buildSquel(flavour)
 			-- use the custom handler if available
 			if (customHandler) then
 				value = customHandler(value, asParam, formattingOptions)
+
+				if type(value) == 'table' and value.rawNesting then
+					return {
+						formatted = true,
+						rawNesting = true,
+						value = value.value,
+					}
+				end
 			end
 
 			return {
@@ -411,11 +425,15 @@ local function _buildSquel(flavour)
 		function cls.BaseBuilder:_formatValueForQueryString(initialValue, formattingOptions)
 			formattingOptions = formattingOptions or {}
 			local _formatCustomValue = self:_formatCustomValue(initialValue, false, formattingOptions)
-			local formatted, value = _formatCustomValue.formatted, _formatCustomValue.value
+			local rawNesting, formatted, value = _formatCustomValue.rawNesting, _formatCustomValue.formatted, _formatCustomValue.value
 
 			-- if formatting took place then return it directly
 			if (formatted) then
-				return self:_applyNestingFormatting(value)
+				if rawNesting then
+					return value
+				else
+					return self:_applyNestingFormatting(value, _shouldApplyNesting(initialValue))
+				end
 			end
 
 			-- if it's an array then format each element separately
@@ -427,7 +445,7 @@ local function _buildSquel(flavour)
 					:join(', ')
 					:value()
 
-				value = self:_applyNestingFormatting(value)
+				value = self:_applyNestingFormatting(value, _shouldApplyNesting(initialValue))
 			else
 				local typeofValue = type(value)
 
@@ -436,7 +454,7 @@ local function _buildSquel(flavour)
 				elseif (typeofValue == 'boolean') then
 					value = value and 'TRUE' or 'FALSE'
 				elseif (cls._isSquelBuilder(value)) then
-					value = self:_applyNestingFormatting(value:toString())
+					value = self:_applyNestingFormatting(value:toString(), _shouldApplyNesting(initialValue))
 				elseif (typeofValue ~= 'number') then
 					-- if it's a string and we have custom string formatting turned on then use that
 					if ('string' == typeofValue and self.options.stringFormatter) then
@@ -460,7 +478,7 @@ local function _buildSquel(flavour)
 			if (nesting == nil) then
 				nesting = true
 			end
-			if (str and type(str) == 'string' and nesting) then
+			if (str and type(str) == 'string' and nesting and not _.options.rawNesting) then
 				-- apply brackets if they're not already existing
 				local alreadyHasBrackets = ('(' == str:sub(1, 1) and ')' == str:sub(-1, -1))
 
@@ -2042,6 +2060,13 @@ local function _buildSquel(flavour)
 		end,
 		str = function(...)
 			local inst = cls.FunctionBlock:new()
+			inst:FUNCTION(...)
+			return inst
+		end,
+		rstr = function(...)
+			local inst = cls.FunctionBlock:new({
+				rawNesting = true
+			})
 			inst:FUNCTION(...)
 			return inst
 		end,
