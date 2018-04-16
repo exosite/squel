@@ -62,7 +62,8 @@ describe('Default query builder options', function()
 			replaceSingleQuotes = false,
 			singleQuoteReplacement = '\'\'',
 			separator = ' ',
-			stringFormatter = nil
+			stringFormatter = nil,
+			rawNesting = false,
 		}, squel.cls.DefaultQueryBuilderOptions)
 	end)
 end)
